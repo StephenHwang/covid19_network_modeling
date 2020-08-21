@@ -9,9 +9,9 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
-```{r Libraries}
+```{r Libraries, include = FALSE}
 library(forecast)
+library(ggplot2)
 ```
 
 
@@ -34,6 +34,8 @@ severity_df = severity_df[-1, ]
 severity_df = as.data.frame(severity_df)
 ```
 
+
+
 ```{r Hollywood Hills}
 #Save rates as a timeseries
 Hollywood_timeseries = as.numeric(ts(df$`Los Angeles - Hollywood Hills`))
@@ -52,7 +54,9 @@ autoplot(forecast(Hollywood_fit, xreg = Hollywood_Sev_Pred)) +
   ylab("Covid Cases")
 ```
 
-```{r Error Test}
+
+
+```{r Hollywood Error Test}
 #taking first few data points and using it to train model
 first_95 = head(df$`Los Angeles - Hollywood Hills`, length(df$`Los Angeles - Hollywood Hills`) - 10)
 first_95ts = ts(as.numeric(first_95))
@@ -78,9 +82,10 @@ last_10_Hollywood = as.data.frame(as.numeric(tail(df$`Los Angeles - Hollywood Hi
 ```
 
 
-```{r City Function}
-city_prediction = function(city) {
-  #Save rates as a timeseries
+
+```{r City Prediction Function, include = FALSE}
+city_prediction_reg = function(city) {
+  #Prediction with severity values as regressors
   city_timeseries = as.numeric(ts(df[,city]))
   
   #Fit to arima
@@ -95,6 +100,36 @@ city_prediction = function(city) {
     ylab("Covid Cases")
 }
 
+city_prediction_nreg = function(city) {
+  #Prediction without severity values as regressors
+  city_timeseries = as.numeric(ts(df[,city]))
+  city_fit = auto.arima(city_timeseries)
 
+  #forecast no regressors  
+  autoplot(forecast(city_fit)) +
+    xlab("Days Since Jan 21st") +
+    ylab("Covid Cases")
+}
+
+city_prediction = function(city) {
+  #complete city prediction function
+  
+  tryCatch(city_prediction_reg(city),
+    error = function(c) {
+      #Sometimes an arima model can't be found with the severity values, so an arima model w/o severity regressors is used instead
+      city_prediction_nreg(city)
+      }
+    
+    )
+  
+}
+
+print(colnames(df)) #all possible city input values
 ```
 
+
+
+```{r Rancho Dominguez}
+city_prediction("Rancho Dominguez")
+
+```

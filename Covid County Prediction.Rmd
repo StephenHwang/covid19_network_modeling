@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Libraries}
 library(forecast)
+library(ggplot2)
 ```
 
 ## Including Plots
@@ -44,7 +45,6 @@ LA_fit = auto.arima(LA_timeseries, xreg = LA_Severity)
 print(LA_fit)
 
 #forecast with regressors
-LA_Severity = as.numeric(ts(severity_df$Los.Angeles..California))
 LA_Sev_Pred = as.numeric(forecast(LA_Severity)$mean) #prediction for LA_Severity
 
 autoplot(forecast(LA_fit, xreg = LA_Sev_Pred)) +
@@ -64,23 +64,6 @@ autoplot(forecast(LA_fit_nr)) +
 ```
 
 
-```{r Quick Error Check/Scratch}
-first_165 = head(df$`Los Angeles, California`, 165)
-first_165ts = ts(as.numeric(first_165))
-
-forecast(first_165ts)
-
-predicted_10_LA = as.data.frame(as.numeric(forecast(first_165ts)$mean))
-last_10_LA = as.data.frame(as.numeric(tail(df$`Los Angeles, California`, 10)))
-
-per_error = ((predicted_10_LA - last_10_LA)/last_10_LA)*100 #percent error
-print(per_error)
-
-plot(cbind(predicted_10_LA, last_10_LA)) +
-  title("LA Last 10 Day Cases")
-```
-
-
 ```{r San Diego - CA Time Series, echo=FALSE}
 
 SD_timeseries = as.numeric(ts(df$`San Diego, California`))
@@ -91,9 +74,9 @@ SD_fit = auto.arima(SD_timeseries, xreg = SD_Severity)
 print(SD_fit)
 
 #forecast with regressors
-SD_Severity = as.numeric(ts(severity_df$San.Diego..California))
 SD_Sev_Pred = as.numeric(forecast(SD_Severity)$mean) #prediction for SD_Severity
 
+#this one is wonky, not sure why
 autoplot(forecast(SD_fit, xreg = SD_Sev_Pred)) +
   xlab("Days Since Jan 21st") +
   ylab("Covid Cases")
@@ -110,7 +93,6 @@ print(SC_fit)
 
 
 #forecast with regressors
-SC_Severity = as.numeric(ts(severity_df$Santa.Cruz..California))
 SC_Sev_Pred = as.numeric(forecast(SC_Severity)$mean) #prediction for SC_Severity
 
 autoplot(forecast(SC_fit, xreg = SC_Sev_Pred)) +
@@ -128,7 +110,6 @@ print(B_M_fit)
 
 
 #forecast with regressors
-B_M_Severity = as.numeric(ts(severity_df$Baltimore..Maryland))
 B_M_Sev_Pred = as.numeric(forecast(B_M_Severity)$mean) #prediction for B_M_Severity
 
 autoplot(forecast(B_M_fit, xreg = B_M_Sev_Pred)) +
