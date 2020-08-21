@@ -1,0 +1,138 @@
+---
+title: "Covid Prediction"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r Libraries}
+library(forecast)
+```
+
+## Including Plots
+
+```{r Data, echo=FALSE}
+#Reading in data frame and organizing it
+
+df = read.csv(file = "US_county_covid_cases_data.csv", header = FALSE)
+df[1,1] = "Date"
+df = t(df)
+colnames(df) <- as.character(unlist(df[1,]))
+df = df[-1, ]
+df = as.data.frame(df)
+Date = as.Date(df$Date)
+
+
+#Reading in data frame for severity
+severity_df = read.csv(file = "desired_county_severity.csv")
+```
+
+
+```{r Los - Angeles Time Series, echo=FALSE}
+#Save rates as a timeseries
+
+LA_timeseries = as.numeric(ts(df$`Los Angeles, California`))
+
+#Fit to arima
+LA_Severity = as.numeric(ts(severity_df$Los.Angeles..California))
+LA_fit = auto.arima(LA_timeseries, xreg = LA_Severity)
+print(LA_fit)
+
+#forecast with regressors
+LA_Severity = as.numeric(ts(severity_df$Los.Angeles..California))
+LA_Sev_Pred = as.numeric(forecast(LA_Severity)$mean) #prediction for LA_Severity
+
+autoplot(forecast(LA_fit, xreg = LA_Sev_Pred)) +
+  xlab("Days Since Jan 21st") +
+  ylab("Covid Cases")
+
+```
+
+
+```{r LA No Regressors}
+#forecast without regressors
+LA_fit_nr = auto.arima(LA_timeseries)
+
+autoplot(forecast(LA_fit_nr)) +
+  xlab("Days Since Jan 21st") +
+  ylab("Covid Cases")
+```
+
+
+```{r Quick Error Check/Scratch}
+first_165 = head(df$`Los Angeles, California`, 165)
+first_165ts = ts(as.numeric(first_165))
+
+forecast(first_165ts)
+
+predicted_10_LA = as.data.frame(as.numeric(forecast(first_165ts)$mean))
+last_10_LA = as.data.frame(as.numeric(tail(df$`Los Angeles, California`, 10)))
+
+per_error = ((predicted_10_LA - last_10_LA)/last_10_LA)*100 #percent error
+print(per_error)
+
+plot(cbind(predicted_10_LA, last_10_LA)) +
+  title("LA Last 10 Day Cases")
+```
+
+
+```{r San Diego - CA Time Series, echo=FALSE}
+
+SD_timeseries = as.numeric(ts(df$`San Diego, California`))
+SD_Severity = as.numeric(ts(severity_df$San.Diego..California))
+
+
+SD_fit = auto.arima(SD_timeseries, xreg = SD_Severity)
+print(SD_fit)
+
+#forecast with regressors
+SD_Severity = as.numeric(ts(severity_df$San.Diego..California))
+SD_Sev_Pred = as.numeric(forecast(SD_Severity)$mean) #prediction for SD_Severity
+
+autoplot(forecast(SD_fit, xreg = SD_Sev_Pred)) +
+  xlab("Days Since Jan 21st") +
+  ylab("Covid Cases")
+```
+
+
+```{r Santa Cruz - CA Time Series}
+SC_timeseries = as.numeric(ts(df$`Santa Cruz, California`))
+SC_Severity = as.numeric(ts(severity_df$Santa.Cruz..California))
+
+
+SC_fit = auto.arima(SC_timeseries, xreg = SC_Severity)
+print(SC_fit)
+
+
+#forecast with regressors
+SC_Severity = as.numeric(ts(severity_df$Santa.Cruz..California))
+SC_Sev_Pred = as.numeric(forecast(SC_Severity)$mean) #prediction for SC_Severity
+
+autoplot(forecast(SC_fit, xreg = SC_Sev_Pred)) +
+  xlab("Days Since Jan 21st") +
+  ylab("Covid Cases")
+```
+
+
+```{r Baltimore - MD Series, echo=FALSE}
+B_M_timeseries = as.numeric(ts(df$`Baltimore, Maryland`))
+B_M_Severity = as.numeric(ts(severity_df$Baltimore..Maryland))
+
+B_M_fit = auto.arima(B_M_timeseries, xreg = B_M_Severity)
+print(B_M_fit)
+
+
+#forecast with regressors
+B_M_Severity = as.numeric(ts(severity_df$Baltimore..Maryland))
+B_M_Sev_Pred = as.numeric(forecast(B_M_Severity)$mean) #prediction for B_M_Severity
+
+autoplot(forecast(B_M_fit, xreg = B_M_Sev_Pred)) +
+  xlab("Days Since Jan 21st") +
+  ylab("Covid Cases")
+```
+
