@@ -1,0 +1,100 @@
+---
+title: "Covid LA Cities"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r Libraries}
+library(forecast)
+```
+
+
+```{r Data, echo=FALSE}
+#reading in data into useable dataframe
+df = read.csv(file = "LA_cities_cases.csv", header = FALSE)
+df[1,1] = "Date"
+df = t(df)
+colnames(df) <- as.character(unlist(df[1,])) #sets cities as column names
+df = df[-1, ] #removes first row entries which contained column names
+df = as.data.frame(df)
+Date = as.Date(df$Date, format = "%d-%m")
+
+
+#severity data
+severity_df = read.csv(file = "LA_cities_severity.csv", header = FALSE)
+severity_df = t(severity_df)
+colnames(severity_df) <- as.character(unlist(severity_df[1,]))
+severity_df = severity_df[-1, ]
+severity_df = as.data.frame(severity_df)
+```
+
+```{r Hollywood Hills}
+#Save rates as a timeseries
+Hollywood_timeseries = as.numeric(ts(df$`Los Angeles - Hollywood Hills`))
+
+#Fit to arima
+Hollywood_Severity = as.numeric(ts(severity_df$`Los Angeles - Hollywood Hills`))
+Hollywood_fit = auto.arima(Hollywood_timeseries, xreg = Hollywood_Severity)
+print(Hollywood_fit)
+
+#forecast with regressors
+Hollywood_Severity = as.numeric(ts(severity_df$`Los Angeles - Hollywood Hills`))
+Hollywood_Sev_Pred = as.numeric(forecast(Hollywood_Severity)$mean) #prediction for future Hollywood_Severity values
+
+autoplot(forecast(Hollywood_fit, xreg = Hollywood_Sev_Pred)) +
+  xlab("Days Since Jan 21st") +
+  ylab("Covid Cases")
+```
+
+```{r Error Test}
+#taking first few data points and using it to train model
+first_95 = head(df$`Los Angeles - Hollywood Hills`, length(df$`Los Angeles - Hollywood Hills`) - 10)
+first_95ts = ts(as.numeric(first_95))
+
+
+sev_first_95 = head(severity_df$`Los Angeles - Hollywood Hills`, length(severity_df$`Los Angeles - Hollywood Hills`) - 10)
+
+sev_first_95ts = ts(as.numeric(sev_first_95))
+
+#Model trained on first days
+fit95 = auto.arima(first_95ts, xreg = sev_first_95ts)
+sev_95pred = as.numeric(forecast(sev_first_95ts)$mean)
+
+#predictions
+pred10 = as.data.frame(as.numeric(forecast(fit95, xreg = sev_95pred)$mean)) #predict last 10 days of dataset
+print(pred10)
+
+#actual values for last 10 days
+last_10_Hollywood = as.data.frame(as.numeric(tail(df$`Los Angeles - Hollywood Hills`, 10)))
+
+#error
+(last_10_Hollywood - pred10)/last_10_Hollywood
+```
+
+
+```{r City Function}
+city_prediction = function(city) {
+  #Save rates as a timeseries
+  city_timeseries = as.numeric(ts(df[,city]))
+  
+  #Fit to arima
+  city_Severity = as.numeric(ts(severity_df[,city]))
+  city_fit = auto.arima(city_timeseries, xreg = city_Severity)
+  
+  #forecast with regressors
+  city_Sev_Pred = as.numeric(forecast(city_Severity)$mean) #prediction for future city_Severity values
+  
+  autoplot(forecast(city_fit, xreg = city_Sev_Pred)) +
+    xlab("Days Since Jan 21st") +
+    ylab("Covid Cases")
+}
+
+
+```
+
