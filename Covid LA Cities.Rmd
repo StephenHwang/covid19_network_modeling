@@ -78,7 +78,7 @@ print(pred10)
 last_10_Hollywood = as.data.frame(as.numeric(tail(df$`Los Angeles - Hollywood Hills`, 10)))
 
 #error
-(last_10_Hollywood - pred10)/last_10_Hollywood
+(pred10 - last_10_Hollywood)/last_10_Hollywood
 ```
 
 
@@ -128,8 +128,62 @@ print(colnames(df)) #all possible city input values
 ```
 
 
-
 ```{r Rancho Dominguez}
 city_prediction("Rancho Dominguez")
+```
+
+
+```{r Errors, include = FALSE}
+city_pred_reg_error = function(city) {
+  #prediction and error checking using severity values
+  #taking first few data points and using it to train model
+  first_95 = head(df[,city], length(df[,city]) - 10)
+  first_95ts = ts(as.numeric(first_95))
+  sev_first_95 = head(severity_df[,city], length(severity_df[,city]) - 10)
+  sev_first_95ts = ts(as.numeric(sev_first_95))
+
+  #Model trained on first days
+  fit95 = auto.arima(first_95ts, xreg = sev_first_95ts)
+  sev_95pred = as.numeric(forecast(sev_first_95ts)$mean)
+
+  #predict last 10 days of dataset
+  pred10 = as.data.frame(as.numeric(forecast(fit95, xreg = sev_95pred)$mean))   
+  #actual values for last 10 days
+  last_10_city = as.data.frame(as.numeric(tail(df[,city], 10)))
+
+  #error
+  return((pred10 - last_10_city)/last_10_city)
+}
+
+city_pred_nreg_error = function(city) {
+  #prediction and error checking without severity values
+  #taking first few data points and using it to train model
+  first_95 = head(df[,city], length(df[,city]) - 10)
+  first_95ts = ts(as.numeric(first_95))
+  
+  #Model trained on first days
+  fit95 = auto.arima(first_95ts)
+
+  #predict last 10 days of dataset
+  pred10 = as.data.frame(as.numeric(forecast(fit95)$mean))
+
+  #actual values for last 10 days
+  last_10_city = as.data.frame(as.numeric(tail(df[,city], 10)))
+
+  #error
+  return((pred10 - last_10_city)/last_10_city)
+}
 
 ```
+
+```{r Model Comparisons}
+#compare model errors with and without severity scores
+#some cities don't work with the severity values because an arima model can't be fit
+reg = city_pred_reg_error("Los Angeles - Century City")
+nreg = city_pred_nreg_error("Los Angeles - Century City")
+
+print(reg) #error with severity values as regression variables
+print(nreg) #error w/o severity values
+```
+
+
