@@ -1,24 +1,20 @@
 ---
-title: "Covid LA Cities"
+title: "Forecast of COVID-19 Cases in LA Cities"
 output: html_document
-editor_options: 
-  chunk_output_type: console
+runtime: shiny
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
-This document is mainly for scratch and testing. For the actual data with graphs and errors, look at the "Shiny Covid LA Cities.Rmd" file
-
 
 ```{r Libraries, include = FALSE}
 library(forecast)
 library(ggplot2)
+library(gridExtra)
 ```
 
-
-```{r Data, echo=FALSE}
+```{r Data, include = FALSE}
 #reading in data into useable dataframe
 df = read.csv(file = "LA_cities_cases.csv", header = FALSE)
 df[1,1] = "Date"
@@ -26,8 +22,8 @@ df = t(df)
 colnames(df) <- as.character(unlist(df[1,])) #sets cities as column names
 df = df[-1, ] #removes first row entries which contained column names
 df = as.data.frame(df)
-Date = as.Date(df$Date, format = "%d-%m")
-
+Date = as.Date(df$Date, format = "%d-%mon")
+df$Date = NULL #remove "Date" column
 
 #severity data
 severity_df = read.csv(file = "LA_cities_severity.csv", header = FALSE)
@@ -37,55 +33,6 @@ severity_df = severity_df[-1, ]
 severity_df = as.data.frame(severity_df)
 ```
 
-
-
-```{r Hollywood Hills}
-#Save rates as a timeseries
-Hollywood_timeseries = as.numeric(ts(df$`Los Angeles - Hollywood Hills`))
-
-#Fit to arima
-Hollywood_Severity = as.numeric(ts(severity_df$`Los Angeles - Hollywood Hills`))
-Hollywood_fit = auto.arima(Hollywood_timeseries, xreg = Hollywood_Severity)
-print(Hollywood_fit)
-
-#forecast with regressors
-Hollywood_Severity = as.numeric(ts(severity_df$`Los Angeles - Hollywood Hills`))
-Hollywood_Sev_Pred = as.numeric(forecast(Hollywood_Severity)$mean) #prediction for future Hollywood_Severity values
-
-autoplot(forecast(Hollywood_fit, xreg = Hollywood_Sev_Pred)) +
-  xlab("Days Since Jan 21st") +
-  ylab("Covid Cases")
-```
-
-
-
-```{r Hollywood Error Test}
-#taking first few data points and using it to train model
-first_95 = head(df$`Los Angeles - Hollywood Hills`, length(df$`Los Angeles - Hollywood Hills`) - 10)
-first_95ts = ts(as.numeric(first_95))
-
-
-sev_first_95 = head(severity_df$`Los Angeles - Hollywood Hills`, length(severity_df$`Los Angeles - Hollywood Hills`) - 10)
-
-sev_first_95ts = ts(as.numeric(sev_first_95))
-
-#Model trained on first days
-fit95 = auto.arima(first_95ts, xreg = sev_first_95ts)
-sev_95pred = as.numeric(forecast(sev_first_95ts)$mean)
-
-#predictions
-pred10 = as.data.frame(as.numeric(forecast(fit95, xreg = sev_95pred)$mean)) #predict last 10 days of dataset
-print(pred10)
-
-#actual values for last 10 days
-last_10_Hollywood = as.data.frame(as.numeric(tail(df$`Los Angeles - Hollywood Hills`, 10)))
-
-#error
-(pred10 - last_10_Hollywood)/last_10_Hollywood
-```
-
-
-
 ```{r City Prediction Function, include = FALSE}
 city_prediction_reg = function(city) {
   #Prediction with severity values as regressors
@@ -93,14 +40,26 @@ city_prediction_reg = function(city) {
   
   #Fit to arima
   city_Severity = as.numeric(ts(severity_df[,city]))
-  city_fit = auto.arima(city_timeseries, xreg = city_Severity)
-  
-  #forecast with regressors
+  city_fit = try(auto.arima(city_timeseries, xreg = city_Severity), silent = TRUE)
   city_Sev_Pred = as.numeric(forecast(city_Severity)$mean) #prediction for future city_Severity values
   
-  autoplot(forecast(city_fit, xreg = city_Sev_Pred)) +
-    xlab("Days Since Jan 21st") +
-    ylab("Covid Cases")
+  
+  if (class(city_fit) == "try-error") {
+    
+    return(NULL)
+    
+  } else {
+    
+    #forecast with regressors
+    city_Sev_Pred = as.numeric(forecast(city_Severity)$mean) #prediction for future city_Severity values
+    
+    return(autoplot(forecast(city_fit, xreg = city_Sev_Pred)) +
+             xlab("Days Since Jan 21st") +
+             ylab("Covid Cases")
+    )
+    
+  }
+
 }
 
 city_prediction_nreg = function(city) {
@@ -109,15 +68,16 @@ city_prediction_nreg = function(city) {
   city_fit = auto.arima(city_timeseries)
 
   #forecast no regressors  
-  autoplot(forecast(city_fit)) +
-    xlab("Days Since Jan 21st") +
-    ylab("Covid Cases")
+  return(autoplot(forecast(city_fit)) +
+           xlab("Days Since Jan 21st") +
+           ylab("Covid Cases")
+  )
 }
 
 city_prediction = function(city) {
   #complete city prediction function
   
-  tryCatch(city_prediction_reg(city),
+  tryCatch(graph_compare,
     error = function(c) {
       #Sometimes an arima model can't be found with the severity values, so an arima model w/o severity regressors is used instead
       city_prediction_nreg(city)
@@ -126,17 +86,9 @@ city_prediction = function(city) {
     )
   
 }
-
-print(colnames(df)) #all possible city input values
 ```
 
-
-```{r Rancho Dominguez}
-city_prediction("Rancho Dominguez")
-```
-
-
-```{r Errors, include = FALSE}
+```{r Error Calculations Table, include = FALSE}
 city_pred_reg_error = function(city) {
   #prediction and error checking using severity values
   #taking first few data points and using it to train model
@@ -182,23 +134,70 @@ city_pred_nreg_error = function(city) {
 }
 
 city_pred_error = function(city) {
-  sev_reg = city_pred_reg_error(city)
+  
+  sev_reg = try(city_pred_reg_error(city), silent = TRUE)
   n_sev_reg = city_pred_nreg_error(city)
-  errors_table = cbind(sev_reg, n_sev_reg)
+  pred_days = as.data.frame(c(1:10))
+  colnames(pred_days) = "Days Since End of Given Data - Prediction Days"
+
+  errors_table = tryCatch(
+    #if sev_reg not found because no suitable arima model then only finds errors with no severity values
+    cbind(pred_days, sev_reg, n_sev_reg),
+    
+    error = function(err) {
+      cbind(pred_days, n_sev_reg)
+    }
+    
+  )
+  
   return(errors_table)
+
 }
 ```
 
-```{r Model Comparisons}
-#compare model errors with and without severity scores
-#some cities don't work with the severity values because an arima model can't be fit
-city_pred_error("Rancho Dominguez")
+```{r Cumulative City Prediction Function, include = FALSE}
+cum_city_prediction_reg = function(city) {
+  #Prediction with severity values as regressors
+  city_timeseries = as.numeric(ts(cumsum(df[,city])))
+  
+  #Fit to arima
+  city_Severity = as.numeric(ts(severity_df[,city]))
+  city_fit = auto.arima(city_timeseries, xreg = city_Severity)
+  
+  #forecast with regressors
+  city_Sev_Pred = as.numeric(forecast(city_Severity)$mean) #prediction for future city_Severity values
+  
+  autoplot(forecast(city_fit, xreg = city_Sev_Pred)) +
+    xlab("Days Since Jan 21st") +
+    ylab("Covid Cases")
+}
+
+cum_city_prediction_nreg = function(city) {
+  #Prediction without severity values as regressors
+  city_timeseries = as.numeric(ts(cumsum(df[,city])))
+  city_fit = auto.arima(city_timeseries)
+
+  #forecast no regressors  
+  autoplot(forecast(city_fit)) +
+    xlab("Days Since Jan 21st") +
+    ylab("Covid Cases")
+}
+
+city_prediction = function(city) {
+  #complete city prediction function
+  
+  tryCatch(city_prediction_reg(city),
+    error = function(c) {
+      #Sometimes an arima model can't be found with the severity values, so an arima model w/o severity regressors is used instead
+      city_prediction_nreg(city)
+      }
+    
+    )
+  
+}
 ```
 
-
-
-```{r Errors with Cumulative Sum, include = FALSE}
-#This is all scratch work
+```{r Error Calculations Table Cumulative, include = FALSE}
 cum_city_pred_reg_error = function(city) {
   #prediction and error checking using severity values
   #taking first few data points and using it to train model
@@ -217,13 +216,15 @@ cum_city_pred_reg_error = function(city) {
   last_10_city = as.data.frame(as.numeric(tail(cumsum(df[,city]), 10)))
 
   #error
-  return((pred10 - last_10_city)/last_10_city)
+  errors = (pred10 - last_10_city)/last_10_city
+  colnames(errors) = "Errors w/ Severity Values"
+  return(errors)
 }
 
 cum_city_pred_nreg_error = function(city) {
   #prediction and error checking without severity values
   #taking first few data points and using it to train model
-  first_95 = head(cumsum(df[,city]), length(df[,city]) - 10)
+  first_95 = head(cumusum(df[,city]), length(df[,city]) - 10)
   first_95ts = ts(as.numeric(first_95))
   
   #Model trained on first days
@@ -236,10 +237,72 @@ cum_city_pred_nreg_error = function(city) {
   last_10_city = as.data.frame(as.numeric(tail(cumsum(df[,city]), 10)))
 
   #error
-  return((pred10 - last_10_city)/last_10_city)
+  errors = (pred10 - last_10_city)/last_10_city
+  colnames(errors) = "Errors w/o Severity Values"
+  return(errors)
 }
+
+cum_city_pred_error = function(city) {
+  
+  sev_reg = try(city_pred_reg_error(city), silent = TRUE)
+  n_sev_reg = city_pred_nreg_error(city)
+
+  errors_table = tryCatch(
+    #if sev_reg not found because no suitable arima model then only finds errors with no severity values
+    cbind(sev_reg, n_sev_reg),
+    
+    error = function(err) {
+      n_sev_reg
+    }
+    
+  )
+  
+  return(errors_table)
+
+}
+```
+
+```{r testing, include = FALSE}
+graph_compare = function(city) {
+  #trying to rearrange graphs side by side
+  par(mfrow=c(1,2))
+  city_prediction_reg(city)
+  city_prediction_nreg(city)
+}
+  
+test1 = city_prediction_reg("Los Angeles - Del Rey")
+test2 = city_prediction_nreg("Los Angeles - Del Rey")
+grid.arrange(test1, test2, nrow = 1,
+             widths = c(2.7, 1))
+
 
 ```
 
+## Covid Forecasts by City
 
+Regression models with severity values and ARIMA errors can be found for most cities. For some cities however, a proper ARIMA model using severity valuest can't be found, so only a normal ARIMA model is given.
+
+```{r Inputs, echo=FALSE}
+inputPanel(
+  selectInput(inputId = "city", 
+                label = "City:",
+                choices = colnames(df)
+                )
+  )
+```
+
+```{r Plot Forecasts, echo = FALSE}
+renderPlot(city_prediction_reg(input$city))
+renderPlot(city_prediction_nreg(input$city))
+```
+
+
+## Prediction Errors of Last 10 Days
+
+Each model predicts the final 10 days of the given data set. The predicted values are compared to the true values, and their errors are found with the formula $\frac{Predicted-Actual}{Actual}$.
+
+```{r Errors Tables, echo = FALSE}
+renderDataTable(city_pred_error(input$city),
+                options = list(dom = 't'))
+```
 
