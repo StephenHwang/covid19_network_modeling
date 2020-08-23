@@ -42,7 +42,6 @@ LA_timeseries = as.numeric(ts(df$`Los Angeles, California`))
 #Fit to arima
 LA_Severity = as.numeric(ts(severity_df$Los.Angeles..California))
 LA_fit = auto.arima(LA_timeseries, xreg = LA_Severity)
-print(LA_fit)
 
 #forecast with regressors
 LA_Sev_Pred = as.numeric(forecast(LA_Severity)$mean) #prediction for LA_Severity
@@ -53,7 +52,6 @@ autoplot(forecast(LA_fit, xreg = LA_Sev_Pred)) +
 
 ```
 
-
 ```{r LA No Regressors}
 #forecast without regressors
 LA_fit_nr = auto.arima(LA_timeseries)
@@ -62,6 +60,16 @@ autoplot(forecast(LA_fit_nr)) +
   xlab("Days Since Jan 21st") +
   ylab("Covid Cases")
 ```
+
+```{r Error Calculations Los Angeles, include = FALSE}
+true_case = as.data.frame(as.numeric(tail(df[,"Los Angeles, California"], 10)))
+reg_case = as.data.frame(forecast(LA_fit, xreg = LA_Sev_Pred)$mean)
+nreg_case = as.data.frame(forecast(LA_fit_nr)$mean)
+
+(reg_case-true_case)/true_case #errors w/ severity values
+(nreg_case-true_case)/true_case #errors w/o severity
+```
+
 
 
 ```{r San Diego - CA Time Series, echo=FALSE}
