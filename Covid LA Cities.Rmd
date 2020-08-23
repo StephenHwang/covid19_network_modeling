@@ -9,6 +9,9 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+This document is mainly for scratch and testing. For the actual data with graphs and errors, look at the "Shiny Covid LA Cities.Rmd" file
+
+
 ```{r Libraries, include = FALSE}
 library(forecast)
 library(ggplot2)
@@ -152,7 +155,9 @@ city_pred_reg_error = function(city) {
   last_10_city = as.data.frame(as.numeric(tail(df[,city], 10)))
 
   #error
-  return((pred10 - last_10_city)/last_10_city)
+  errors = (pred10 - last_10_city)/last_10_city
+  colnames(errors) = "Errors w/ Severity Values"
+  return(errors)
 }
 
 city_pred_nreg_error = function(city) {
@@ -171,19 +176,70 @@ city_pred_nreg_error = function(city) {
   last_10_city = as.data.frame(as.numeric(tail(df[,city], 10)))
 
   #error
-  return((pred10 - last_10_city)/last_10_city)
+  errors = (pred10 - last_10_city)/last_10_city
+  colnames(errors) = "Errors w/o Severity Values"
+  return(errors)
 }
 
+city_pred_error = function(city) {
+  sev_reg = city_pred_reg_error(city)
+  n_sev_reg = city_pred_nreg_error(city)
+  errors_table = cbind(sev_reg, n_sev_reg)
+  return(errors_table)
+}
 ```
 
 ```{r Model Comparisons}
 #compare model errors with and without severity scores
 #some cities don't work with the severity values because an arima model can't be fit
-reg = city_pred_reg_error("Los Angeles - Century City")
-nreg = city_pred_nreg_error("Los Angeles - Century City")
-
-print(reg) #error with severity values as regression variables
-print(nreg) #error w/o severity values
+city_pred_error("Rancho Dominguez")
 ```
+
+
+
+```{r Errors with Cumulative Sum, include = FALSE}
+#This is all scratch work
+cum_city_pred_reg_error = function(city) {
+  #prediction and error checking using severity values
+  #taking first few data points and using it to train model
+  first_95 = head(cumsum(df[,city]), length(df[,city]) - 10)
+  first_95ts = ts(as.numeric(first_95))
+  sev_first_95 = head(severity_df[,city], length(severity_df[,city]) - 10)
+  sev_first_95ts = ts(as.numeric(sev_first_95))
+
+  #Model trained on first days
+  fit95 = auto.arima(first_95ts, xreg = sev_first_95ts)
+  sev_95pred = as.numeric(forecast(sev_first_95ts)$mean)
+
+  #predict last 10 days of dataset
+  pred10 = as.data.frame(as.numeric(forecast(fit95, xreg = sev_95pred)$mean))   
+  #actual values for last 10 days
+  last_10_city = as.data.frame(as.numeric(tail(cumsum(df[,city]), 10)))
+
+  #error
+  return((pred10 - last_10_city)/last_10_city)
+}
+
+cum_city_pred_nreg_error = function(city) {
+  #prediction and error checking without severity values
+  #taking first few data points and using it to train model
+  first_95 = head(cumsum(df[,city]), length(df[,city]) - 10)
+  first_95ts = ts(as.numeric(first_95))
+  
+  #Model trained on first days
+  fit95 = auto.arima(first_95ts)
+
+  #predict last 10 days of dataset
+  pred10 = as.data.frame(as.numeric(forecast(fit95)$mean))
+
+  #actual values for last 10 days
+  last_10_city = as.data.frame(as.numeric(tail(cumsum(df[,city]), 10)))
+
+  #error
+  return((pred10 - last_10_city)/last_10_city)
+}
+
+```
+
 
 
