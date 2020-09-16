@@ -255,3 +255,32 @@ cum_city_pred_nreg_error = function(city) {
 
 
 
+```{r Severity Value Data}
+library(tidyverse)
+new_LA = read.csv(file = "new_LA_cities_severity.csv", header = FALSE)
+LA_cluster = read.csv(file = "new_LA_cities_clusters.csv", header = FALSE)
+
+sev_cluster = merge(new_LA, LA_cluster, by="V1", all=TRUE)
+sev_cluster = sev_cluster %>% rename("Cluster" = "V2.y")
+sev_cluster = sev_cluster[-c(1, 2), ]
+sev_cluster$V1 = NULL
+sev_cluster = sev_cluster %>% mutate_if(is.character,as.numeric)
+sev_cluster = aggregate(. ~ Cluster, data=sev_cluster, FUN=mean)
+```
+
+
+```{r Cluster Cases }
+LA_cluster_cases = read.csv(file = "LA_cities_cases.csv", header = FALSE)
+LA_cluster = read.csv(file = "new_LA_cities_clusters.csv", header = FALSE)
+
+case_cluster = merge(LA_cluster_cases, LA_cluster, by="V1", all=TRUE)
+case_cluster = case_cluster %>% rename("Cluster" = "V2.y")
+case_cluster = case_cluster[-c(1, 2), ]
+case_cluster$V1 = NULL
+case_cluster = case_cluster %>% mutate_if(is.character,as.numeric)
+case_cluster = aggregate(. ~ Cluster, data=case_cluster, FUN=sum)
+```
+
+
+
+
