@@ -1,5 +1,5 @@
 ---
-title: "Forecast of COVID-19 Cases in LA Cities"
+title: "Forecast of COVID-19 Cases in La Cities With Cluster Values"
 output: html_document
 runtime: shiny
 ---
@@ -281,6 +281,8 @@ grid.arrange(test1, test2, nrow = 1,
 ## Covid Forecasts by City
 
 Regression models with severity values and ARIMA errors can be found for most cities. For some cities however, a proper ARIMA model using severity valuest can't be found, so only a normal ARIMA model is given.
+
+Here, the severity values were based on the cluster a city belonged to rather than the city's individual value.
 
 ```{r Inputs, echo=FALSE}
 inputPanel(
